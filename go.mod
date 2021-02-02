@@ -8,3 +8,5 @@ require (
 	github.com/urfave/cli v1.22.5
 	github.com/zhiqiangxu/util v0.0.0-20210114025214-5f087283a7a6
 )
+
+replace github.com/ethereum/go-ethereum => ../go-ethereum
