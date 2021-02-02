@@ -26,6 +26,7 @@ var ClientCmd = cli.Command{
 	Usage: "client actions",
 	Subcommands: []cli.Command{
 		clientCreateContractCmd,
+		clientCallContractCmd,
 	},
 }
 
@@ -36,6 +37,22 @@ var clientCreateContractCmd = cli.Command{
 	Flags: []cli.Flag{
 		flag.SenderFlag,
 		flag.ContractPathFlag,
+		flag.GasFlag,
+		flag.GasPriceFlag,
+		flag.ValueFlag,
+		flag.ConfigFlag,
+	},
+}
+
+var clientCallContractCmd = cli.Command{
+	Name:   "call_contract",
+	Usage:  "trigger call_contract action",
+	Action: clientCallContract,
+	Flags: []cli.Flag{
+		flag.SenderFlag,
+		flag.ReceiverFlag,
+		flag.ContractPathFlag,
+		flag.MethodFlag,
 		flag.GasFlag,
 		flag.GasPriceFlag,
 		flag.ValueFlag,
@@ -66,7 +83,7 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 	)
 	for name, c := range contracts {
 		nameParts := strings.Split(name, ":")
-		if nameParts[len(nameParts)-1]+".sol" != contractFileName {
+		if strings.ToLower(nameParts[len(nameParts)-1])+".sol" != strings.ToLower(contractFileName) {
 			continue
 		}
 
@@ -95,7 +112,12 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 		}
 	}
 
-	codeAndInput := append([]byte(contract.Code), inputBin...)
+	if contract == nil {
+		err = fmt.Errorf("contract not found")
+		return
+	}
+	codeAndInput := append(common.FromHex(contract.Code), inputBin...)
+
 	gas := ctx.Uint64(flag.GasFlag.Name)
 	gasPrice, ok := big.NewInt(0).SetString(ctx.String(flag.GasPriceFlag.Name), 10)
 	if !ok {
@@ -131,6 +153,121 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 
 	inputBytes, _ := json.Marshal(input)
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%d%s", conf.Port, server.CreateContractEndpoint), "application/json", bytes.NewBuffer(inputBytes))
+	if err != nil {
+		err = fmt.Errorf("API err:%v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	var output server.CreateContractOutput
+	err = json.Unmarshal(respBytes, &output)
+	if err != nil {
+		return
+	}
+
+	outputBytes, _ := json.Marshal(output)
+	fmt.Println("output", string(outputBytes))
+	return
+}
+
+func clientCallContract(ctx *cli.Context) (err error) {
+
+	// type CallContractInput struct {
+	// 	Input    []byte
+	// 	Gas      uint64
+	// 	Sender   common.Address
+	// 	Receiver common.Address
+	// 	GasPrice *big.Int
+	// 	Value    *big.Int
+	// }
+
+	sender := common.HexToAddress(ctx.String(flag.SenderFlag.Name))
+	receiver := common.HexToAddress(ctx.String(flag.ReceiverFlag.Name))
+	contracts, err := compiler.CompileSolidity("", ctx.String(flag.ContractPathFlag.Name))
+	if err != nil {
+		utils.Fatalf("CompileSolidity err: %v", err)
+	}
+	contractFileName := filepath.Base(ctx.String(flag.ContractPathFlag.Name))
+
+	var (
+		contract    *compiler.Contract
+		contractABI abi.ABI
+	)
+	for name, c := range contracts {
+		nameParts := strings.Split(name, ":")
+		if strings.ToLower(nameParts[len(nameParts)-1])+".sol" != strings.ToLower(contractFileName) {
+			continue
+		}
+
+		if contract != nil {
+			utils.Fatalf("Multiple contracts filtered.")
+		}
+		contract = c
+		abiBytes, _ := json.Marshal(contract.Info.AbiDefinition)
+		contractABI, err = abi.JSON(strings.NewReader(string(abiBytes)))
+		if err != nil {
+			err = fmt.Errorf("abi.JSON err:%v", err)
+			return
+		}
+	}
+
+	var args []interface{}
+	for _, arg := range ctx.Args() {
+		if strings.HasPrefix(arg, "0x") {
+			args = append(args, common.HexToAddress(arg))
+		} else {
+			args = append(args, arg)
+		}
+
+	}
+
+	inputBin, err := contractABI.Pack(ctx.String(flag.MethodFlag.Name), args...)
+	if err != nil {
+		err = fmt.Errorf("abi.Pack err:%v", err)
+		return
+	}
+
+	gas := ctx.Uint64(flag.GasFlag.Name)
+	gasPrice, ok := big.NewInt(0).SetString(ctx.String(flag.GasPriceFlag.Name), 10)
+	if !ok {
+		err = fmt.Errorf("invalid gas price:%s", ctx.String(flag.GasPriceFlag.Name))
+		return
+	}
+	value, ok := big.NewInt(0).SetString(ctx.String(flag.ValueFlag.Name), 10)
+	if !ok {
+		err = fmt.Errorf("invalid value:%s", ctx.String(flag.ValueFlag.Name))
+		return
+	}
+
+	input := server.CallContractInput{
+		Sender:   sender,
+		Receiver: receiver,
+		Input:    inputBin,
+		Gas:      gas,
+		GasPrice: gasPrice,
+		Value:    value,
+	}
+
+	file := ctx.String(flag.ConfigFlag.Name)
+	confBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		err = fmt.Errorf("config file not found:%s", file)
+		return
+	}
+
+	var conf config.Config
+	err = json.Unmarshal(confBytes, &conf)
+	if err != nil {
+		return
+	}
+
+	inputBytes, _ := json.Marshal(input)
+	resp, err := http.Post(fmt.Sprintf("http://localhost:%d%s", conf.Port, server.CallContractEndpoint), "application/json", bytes.NewBuffer(inputBytes))
 	if err != nil {
 		err = fmt.Errorf("API err:%v", err)
 		return

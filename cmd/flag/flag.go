@@ -40,6 +40,13 @@ var ContractPathFlag = cli.StringFlag{
 	Required: true,
 }
 
+// MethodFlag ...
+var MethodFlag = cli.StringFlag{
+	Name:     "method",
+	Usage:    "specify method name",
+	Required: true,
+}
+
 // SenderFlag ...
 var SenderFlag = cli.StringFlag{
 	Name:     "sender",

@@ -42,8 +42,7 @@ func (s *Server) handleCreateContract(input CreateContractInput) (output CreateC
 		debugLogger = vm.NewStructLogger(logconfig)
 	}
 
-	s.statedb.CreateAccount(input.Sender)
-	fmt.Println("sender", input.Sender.Hex(), "balance", s.statedb.GetBalance(input.Sender))
+	fmt.Println("sender", input.Sender.Hex(), "balance", s.statedb.GetBalance(input.Sender), "nonce", s.statedb.GetNonce(input.Sender))
 
 	runtimeConfig := runtime.Config{
 		Origin:      input.Sender,
@@ -75,14 +74,15 @@ func (s *Server) handleCreateContract(input CreateContractInput) (output CreateC
 	}
 
 	outputBytes, leftOverGas, stats, err := timedExec(s.conf.Bench, execFunc)
-	output.Result = outputBytes
 	if err != nil {
 		output.ErrMsg = err.Error()
+		return
 	}
 
+	s.statedb.Commit(true)
+	s.statedb.IntermediateRoot(true)
+
 	if s.conf.Dump {
-		s.statedb.Commit(true)
-		s.statedb.IntermediateRoot(true)
 		fmt.Println(string(s.statedb.Dump(false, false, true)))
 	}
 
@@ -171,7 +171,7 @@ func (s *Server) handleCallContract(input CallContractInput) (output CallContrac
 		debugLogger = vm.NewStructLogger(logconfig)
 	}
 
-	s.statedb.CreateAccount(input.Sender)
+	// s.statedb.CreateAccount(input.Sender)
 
 	runtimeConfig := runtime.Config{
 		Origin:      input.Sender,
@@ -204,11 +204,12 @@ func (s *Server) handleCallContract(input CallContractInput) (output CallContrac
 	output.Result = outputBytes
 	if err != nil {
 		output.ErrMsg = err.Error()
+		return
 	}
 
+	s.statedb.Commit(true)
+	s.statedb.IntermediateRoot(true)
 	if s.conf.Dump {
-		s.statedb.Commit(true)
-		s.statedb.IntermediateRoot(true)
 		fmt.Println(string(s.statedb.Dump(false, false, true)))
 	}
 

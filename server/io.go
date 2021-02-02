@@ -18,7 +18,6 @@ type CreateContractInput struct {
 // CreateContractOutput ...
 type CreateContractOutput struct {
 	Addr   common.Address
-	Result []byte
 	ErrMsg string
 }
 
