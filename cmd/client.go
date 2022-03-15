@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"math/big"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -25,15 +27,16 @@ var ClientCmd = cli.Command{
 	Name:  "client",
 	Usage: "client actions",
 	Subcommands: []cli.Command{
-		clientCreateContractCmd,
-		clientCallContractCmd,
+		clientDeployCmd,
+		clientCallCmd,
+		clientModSolcVersionCmd,
 	},
 }
 
-var clientCreateContractCmd = cli.Command{
-	Name:   "create_contract",
-	Usage:  "trigger create_contract action",
-	Action: clientCreateContract,
+var clientDeployCmd = cli.Command{
+	Name:   "deploy",
+	Usage:  "trigger deploy action",
+	Action: clientDeploy,
 	Flags: []cli.Flag{
 		flag.SenderFlag,
 		flag.ContractPathFlag,
@@ -44,10 +47,10 @@ var clientCreateContractCmd = cli.Command{
 	},
 }
 
-var clientCallContractCmd = cli.Command{
-	Name:   "call_contract",
-	Usage:  "trigger call_contract action",
-	Action: clientCallContract,
+var clientCallCmd = cli.Command{
+	Name:   "call",
+	Usage:  "trigger call action",
+	Action: clientCall,
 	Flags: []cli.Flag{
 		flag.SenderFlag,
 		flag.ReceiverFlag,
@@ -60,9 +63,19 @@ var clientCallContractCmd = cli.Command{
 	},
 }
 
-func clientCreateContract(ctx *cli.Context) (err error) {
+var clientModSolcVersionCmd = cli.Command{
+	Name:   "msv",
+	Usage:  "modify solc version",
+	Action: clientModSolcVersion,
+	Flags: []cli.Flag{
+		flag.DirFlag,
+		flag.VersionFlag,
+	},
+}
 
-	// type CreateContractInput struct {
+func clientDeploy(ctx *cli.Context) (err error) {
+
+	// type DeployInput struct {
 	// 	Sender       common.Address
 	// 	CodeAndInput []byte
 	// 	Gas          uint64
@@ -130,7 +143,7 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 		return
 	}
 
-	input := server.CreateContractInput{
+	input := server.DeployInput{
 		Sender:       sender,
 		CodeAndInput: codeAndInput,
 		Gas:          gas,
@@ -152,7 +165,7 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 	}
 
 	inputBytes, _ := json.Marshal(input)
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%d%s", conf.Port, server.CreateContractEndpoint), "application/json", bytes.NewBuffer(inputBytes))
+	resp, err := http.Post(fmt.Sprintf("http://localhost:%d%s", conf.Port, server.DeployEndpoint), "application/json", bytes.NewBuffer(inputBytes))
 	if err != nil {
 		err = fmt.Errorf("API err:%v", err)
 		return
@@ -164,7 +177,7 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 		return
 	}
 
-	var output server.CreateContractOutput
+	var output server.DeployOutput
 	err = json.Unmarshal(respBytes, &output)
 	if err != nil {
 		return
@@ -175,9 +188,9 @@ func clientCreateContract(ctx *cli.Context) (err error) {
 	return
 }
 
-func clientCallContract(ctx *cli.Context) (err error) {
+func clientCall(ctx *cli.Context) (err error) {
 
-	// type CallContractInput struct {
+	// type CallInput struct {
 	// 	Input    []byte
 	// 	Gas      uint64
 	// 	Sender   common.Address
@@ -244,7 +257,7 @@ func clientCallContract(ctx *cli.Context) (err error) {
 		return
 	}
 
-	input := server.CallContractInput{
+	input := server.CallInput{
 		Sender:   sender,
 		Receiver: receiver,
 		Input:    inputBin,
@@ -267,7 +280,7 @@ func clientCallContract(ctx *cli.Context) (err error) {
 	}
 
 	inputBytes, _ := json.Marshal(input)
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%d%s", conf.Port, server.CallContractEndpoint), "application/json", bytes.NewBuffer(inputBytes))
+	resp, err := http.Post(fmt.Sprintf("http://localhost:%d%s", conf.Port, server.CallEndpoint), "application/json", bytes.NewBuffer(inputBytes))
 	if err != nil {
 		err = fmt.Errorf("API err:%v", err)
 		return
@@ -279,7 +292,7 @@ func clientCallContract(ctx *cli.Context) (err error) {
 		return
 	}
 
-	var output server.CallContractOutput
+	var output server.CallOutput
 	err = json.Unmarshal(respBytes, &output)
 	if err != nil {
 		return
@@ -287,5 +300,30 @@ func clientCallContract(ctx *cli.Context) (err error) {
 
 	outputBytes, _ := json.Marshal(output)
 	fmt.Println("output", string(outputBytes))
+	return
+}
+
+func clientModSolcVersion(ctx *cli.Context) (err error) {
+	re := regexp.MustCompile(`pragma\s+solidity\s+([^;])*`)
+
+	fmt.Println("root dir", ctx.String(flag.DirFlag.Name))
+	err = filepath.WalkDir(ctx.String(flag.DirFlag.Name), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if filepath.Ext(d.Name()) == ".sol" {
+			fmt.Println("handling", path)
+			// modify solc version
+			code, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			replacedCode := re.ReplaceAllString(string(code), fmt.Sprintf("pragma solidity %s", ctx.String(flag.VersionFlag.Name)))
+			return ioutil.WriteFile(path, []byte(replacedCode), 0777)
+		}
+		return nil
+	})
 	return
 }

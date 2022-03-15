@@ -6,38 +6,38 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (s *Server) createContract(c *gin.Context) {
+func (s *Server) deploy(c *gin.Context) {
 	if !s.tmutex.TryLock() {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "no concurrent allowed"})
 		return
 	}
 	defer s.tmutex.Unlock()
 
-	var input CreateContractInput
+	var input DeployInput
 	if err := c.ShouldBind(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
-	output := s.handleCreateContract(input)
+	output := s.handleDeploy(input)
 
 	c.JSON(http.StatusOK, output)
 }
 
-func (s *Server) callContract(c *gin.Context) {
+func (s *Server) call(c *gin.Context) {
 	if !s.tmutex.TryLock() {
 		c.JSON(http.StatusOK, "no concurrent allowed")
 		return
 	}
 	defer s.tmutex.Unlock()
 
-	var input CallContractInput
+	var input CallInput
 	if err := c.ShouldBind(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
-	output := s.handleCallContract(input)
+	output := s.handleCall(input)
 
 	c.JSON(http.StatusOK, output)
 }

@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	// CreateContractEndpoint ...
-	CreateContractEndpoint = "/create_contract"
-	// CallContractEndpoint ...
-	CallContractEndpoint = "/call_contract"
+	// DeployEndpoint ...
+	DeployEndpoint = "/deploy"
+	// CallEndpoint ...
+	CallEndpoint = "/call"
 )
 
 // Server ...
@@ -66,8 +66,8 @@ func (s *Server) initLogger() {
 func (s *Server) startHTTP() error {
 	r := gin.Default()
 
-	r.POST(CreateContractEndpoint, s.createContract)
-	r.POST(CallContractEndpoint, s.callContract)
+	r.POST(DeployEndpoint, s.deploy)
+	r.POST(CallEndpoint, s.call)
 
 	return r.Run(fmt.Sprintf(":%d", s.conf.Port))
 

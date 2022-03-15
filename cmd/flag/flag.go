@@ -59,3 +59,15 @@ var ReceiverFlag = cli.StringFlag{
 	Name:  "receiver",
 	Usage: "receiver of tx",
 }
+
+// DirFlag ...
+var DirFlag = cli.StringFlag{
+	Name:  "dir",
+	Usage: "directory of solidity",
+}
+
+// VersionFlag ...
+var VersionFlag = cli.StringFlag{
+	Name:  "version",
+	Usage: "version of solidity",
+}

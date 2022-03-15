@@ -12,7 +12,6 @@ type Config struct {
 	DisableStorage    bool
 	DisableReturnData bool
 	Bench             bool
-	EVMInterpreter    string
 	Machine           bool
 	Debug             bool
 	Dump              bool

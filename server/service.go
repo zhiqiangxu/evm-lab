@@ -11,17 +11,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/core/vm/runtime"
+	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/params"
 )
 
-func (s *Server) handleCreateContract(input CreateContractInput) (output CreateContractOutput) {
+func (s *Server) handleDeploy(input DeployInput) (output DeployOutput) {
 
-	logconfig := &vm.LogConfig{
-		DisableMemory:     s.conf.DisableMemory,
-		DisableStack:      s.conf.DisableStack,
-		DisableStorage:    s.conf.DisableStorage,
-		DisableReturnData: s.conf.DisableReturnData,
-		Debug:             s.conf.Debug,
+	logconfig := &logger.Config{
+		EnableMemory:     !s.conf.DisableMemory,
+		DisableStack:     s.conf.DisableStack,
+		DisableStorage:   s.conf.DisableStorage,
+		EnableReturnData: !s.conf.DisableReturnData,
+		Debug:            s.conf.Debug,
 	}
 
 	if s.conf.Genesis.GasLimit != 0 {
@@ -29,17 +30,17 @@ func (s *Server) handleCreateContract(input CreateContractInput) (output CreateC
 	}
 
 	var (
-		tracer      vm.Tracer
-		debugLogger *vm.StructLogger
+		tracer      vm.EVMLogger
+		debugLogger *logger.StructLogger
 	)
 
 	if s.conf.Machine {
-		tracer = vm.NewJSONLogger(logconfig, os.Stdout)
+		tracer = logger.NewJSONLogger(logconfig, os.Stdout)
 	} else if s.conf.Debug {
-		debugLogger = vm.NewStructLogger(logconfig)
+		debugLogger = logger.NewStructLogger(logconfig)
 		tracer = debugLogger
 	} else {
-		debugLogger = vm.NewStructLogger(logconfig)
+		debugLogger = logger.NewStructLogger(logconfig)
 	}
 
 	fmt.Println("sender", input.Sender.Hex(), "balance", s.statedb.GetBalance(input.Sender), "nonce", s.statedb.GetNonce(input.Sender))
@@ -55,9 +56,8 @@ func (s *Server) handleCreateContract(input CreateContractInput) (output CreateC
 		Coinbase:    s.conf.Genesis.Coinbase,
 		BlockNumber: new(big.Int).SetUint64(s.conf.Genesis.Number),
 		EVMConfig: vm.Config{
-			Tracer:         tracer,
-			Debug:          s.conf.Debug || s.conf.Machine,
-			EVMInterpreter: s.conf.EVMInterpreter,
+			Tracer: tracer,
+			Debug:  s.conf.Debug || s.conf.Machine,
 		},
 	}
 
@@ -83,16 +83,16 @@ func (s *Server) handleCreateContract(input CreateContractInput) (output CreateC
 	s.statedb.IntermediateRoot(true)
 
 	if s.conf.Dump {
-		fmt.Println(string(s.statedb.Dump(false, false, true)))
+		fmt.Println(string(s.statedb.Dump(nil)))
 	}
 
 	if s.conf.Debug {
 		if debugLogger != nil {
 			fmt.Fprintln(os.Stderr, "#### TRACE ####")
-			vm.WriteTrace(os.Stderr, debugLogger.StructLogs())
+			logger.WriteTrace(os.Stderr, debugLogger.StructLogs())
 		}
 		fmt.Fprintln(os.Stderr, "#### LOGS ####")
-		vm.WriteLogs(os.Stderr, s.statedb.Logs())
+		logger.WriteLogs(os.Stderr, s.statedb.Logs())
 	}
 
 	if s.conf.Bench || s.conf.StatDump {
@@ -144,13 +144,13 @@ func timedExec(bench bool, execFunc func() ([]byte, uint64, error)) (output []by
 	return output, gasLeft, stats, err
 }
 
-func (s *Server) handleCallContract(input CallContractInput) (output CallContractOutput) {
-	logconfig := &vm.LogConfig{
-		DisableMemory:     s.conf.DisableMemory,
-		DisableStack:      s.conf.DisableStack,
-		DisableStorage:    s.conf.DisableStorage,
-		DisableReturnData: s.conf.DisableReturnData,
-		Debug:             s.conf.Debug,
+func (s *Server) handleCall(input CallInput) (output CallOutput) {
+	logconfig := &logger.Config{
+		EnableMemory:     !s.conf.DisableMemory,
+		DisableStack:     s.conf.DisableStack,
+		DisableStorage:   s.conf.DisableStorage,
+		EnableReturnData: !s.conf.DisableReturnData,
+		Debug:            s.conf.Debug,
 	}
 
 	if s.conf.Genesis.GasLimit != 0 {
@@ -158,17 +158,17 @@ func (s *Server) handleCallContract(input CallContractInput) (output CallContrac
 	}
 
 	var (
-		tracer      vm.Tracer
-		debugLogger *vm.StructLogger
+		tracer      vm.EVMLogger
+		debugLogger *logger.StructLogger
 	)
 
 	if s.conf.Machine {
-		tracer = vm.NewJSONLogger(logconfig, os.Stdout)
+		tracer = logger.NewJSONLogger(logconfig, os.Stdout)
 	} else if s.conf.Debug {
-		debugLogger = vm.NewStructLogger(logconfig)
+		debugLogger = logger.NewStructLogger(logconfig)
 		tracer = debugLogger
 	} else {
-		debugLogger = vm.NewStructLogger(logconfig)
+		debugLogger = logger.NewStructLogger(logconfig)
 	}
 
 	// s.statedb.CreateAccount(input.Sender)
@@ -184,9 +184,8 @@ func (s *Server) handleCallContract(input CallContractInput) (output CallContrac
 		Coinbase:    s.conf.Genesis.Coinbase,
 		BlockNumber: new(big.Int).SetUint64(s.conf.Genesis.Number),
 		EVMConfig: vm.Config{
-			Tracer:         tracer,
-			Debug:          s.conf.Debug || s.conf.Machine,
-			EVMInterpreter: s.conf.EVMInterpreter,
+			Tracer: tracer,
+			Debug:  s.conf.Debug || s.conf.Machine,
 		},
 	}
 
@@ -210,16 +209,16 @@ func (s *Server) handleCallContract(input CallContractInput) (output CallContrac
 	s.statedb.Commit(true)
 	s.statedb.IntermediateRoot(true)
 	if s.conf.Dump {
-		fmt.Println(string(s.statedb.Dump(false, false, true)))
+		fmt.Println(string(s.statedb.Dump(nil)))
 	}
 
 	if s.conf.Debug {
 		if debugLogger != nil {
 			fmt.Fprintln(os.Stderr, "#### TRACE ####")
-			vm.WriteTrace(os.Stderr, debugLogger.StructLogs())
+			logger.WriteTrace(os.Stderr, debugLogger.StructLogs())
 		}
 		fmt.Fprintln(os.Stderr, "#### LOGS ####")
-		vm.WriteLogs(os.Stderr, s.statedb.Logs())
+		logger.WriteLogs(os.Stderr, s.statedb.Logs())
 	}
 
 	if s.conf.Bench || s.conf.StatDump {

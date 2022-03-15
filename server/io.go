@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// CreateContractInput ...
-type CreateContractInput struct {
+// DeployInput ...
+type DeployInput struct {
 	Sender       common.Address
 	CodeAndInput []byte
 	Gas          uint64
@@ -15,14 +15,14 @@ type CreateContractInput struct {
 	Value        *big.Int
 }
 
-// CreateContractOutput ...
-type CreateContractOutput struct {
+// DeployOutput ...
+type DeployOutput struct {
 	Addr   common.Address
 	ErrMsg string
 }
 
-// CallContractInput ...
-type CallContractInput struct {
+// CallInput ...
+type CallInput struct {
 	Input    []byte
 	Gas      uint64
 	Sender   common.Address
@@ -31,8 +31,8 @@ type CallContractInput struct {
 	Value    *big.Int
 }
 
-// CallContractOutput ...
-type CallContractOutput struct {
+// CallOutput ...
+type CallOutput struct {
 	Result []byte
 	ErrMsg string
 }
