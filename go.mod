@@ -7,4 +7,5 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/urfave/cli v1.22.5
 	github.com/zhiqiangxu/util v0.0.0-20210114025214-5f087283a7a6
+	gotest.tools v2.2.0+incompatible
 )

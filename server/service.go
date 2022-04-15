@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	goruntime "runtime"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/core/vm/runtime"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
@@ -75,7 +77,7 @@ func (s *Server) handleDeploy(input DeployInput) (output DeployOutput) {
 
 	outputBytes, leftOverGas, stats, err := timedExec(s.conf.Bench, execFunc)
 	if err != nil {
-		output.ErrMsg = err.Error()
+		output.ErrMsg = parseRevertReason(err, outputBytes)
 		return
 	}
 
@@ -109,6 +111,23 @@ allocated bytes: %d
 		}
 	}
 	return
+}
+
+// FYI: https://coder-question.com/cq-blog/194033
+func parseRevertReason(revertErr error, returnData []byte) string {
+	StringTy, _ := abi.NewType("string", "", nil)
+
+	param := abi.Arguments{
+		{Type: StringTy},
+	}
+	args, err := param.Unpack(returnData[4:])
+	var msg string
+	if err != nil {
+		msg = err.Error()
+	} else {
+		msg = args[0].(string)
+	}
+	return fmt.Sprintf("Error:%v Method:0x%s Msg:'%s' Raw:%v", revertErr, hex.EncodeToString(returnData[0:4]), msg, returnData)
 }
 
 type execStats struct {
@@ -202,7 +221,7 @@ func (s *Server) handleCall(input CallInput) (output CallOutput) {
 	outputBytes, leftOverGas, stats, err := timedExec(s.conf.Bench, execFunc)
 	output.Result = outputBytes
 	if err != nil {
-		output.ErrMsg = err.Error()
+		output.ErrMsg = parseRevertReason(err, outputBytes)
 		return
 	}
 
