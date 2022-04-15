@@ -10,6 +10,7 @@ import (
 
 func setupAPP() *cli.App {
 	app := cli.NewApp()
+	app.EnableBashCompletion = true
 	app.Usage = "EvmLab Cli"
 	app.Copyright = "Copyright in 2021"
 	app.Commands = []cli.Command{
