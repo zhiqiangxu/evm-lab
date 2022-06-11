@@ -26,6 +26,11 @@ var GasPriceFlag = cli.StringFlag{
 	Value: "0",
 }
 
+var SolcFlag = cli.StringFlag{
+	Name:  "solc",
+	Usage: "solc path",
+}
+
 // ValueFlag ...
 var ValueFlag = cli.StringFlag{
 	Name:  "value",

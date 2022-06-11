@@ -39,6 +39,7 @@ var clientDeployCmd = cli.Command{
 	Action: clientDeploy,
 	Flags: []cli.Flag{
 		flag.SenderFlag,
+		flag.SolcFlag,
 		flag.ContractPathFlag,
 		flag.GasFlag,
 		flag.GasPriceFlag,
@@ -53,6 +54,7 @@ var clientCallCmd = cli.Command{
 	Action: clientCall,
 	Flags: []cli.Flag{
 		flag.SenderFlag,
+		flag.SolcFlag,
 		flag.ReceiverFlag,
 		flag.ContractPathFlag,
 		flag.MethodFlag,
@@ -84,7 +86,7 @@ func clientDeploy(ctx *cli.Context) (err error) {
 	// }
 
 	sender := common.HexToAddress(ctx.String(flag.SenderFlag.Name))
-	contracts, err := compiler.CompileSolidity("", ctx.String(flag.ContractPathFlag.Name))
+	contracts, err := compiler.CompileSolidity(ctx.String(flag.SolcFlag.Name), ctx.String(flag.ContractPathFlag.Name))
 	if err != nil {
 		utils.Fatalf("CompileSolidity err: %v", err)
 	}
@@ -201,7 +203,7 @@ func clientCall(ctx *cli.Context) (err error) {
 
 	sender := common.HexToAddress(ctx.String(flag.SenderFlag.Name))
 	receiver := common.HexToAddress(ctx.String(flag.ReceiverFlag.Name))
-	contracts, err := compiler.CompileSolidity("", ctx.String(flag.ContractPathFlag.Name))
+	contracts, err := compiler.CompileSolidity(ctx.String(flag.SolcFlag.Name), ctx.String(flag.ContractPathFlag.Name))
 	if err != nil {
 		utils.Fatalf("CompileSolidity err: %v", err)
 	}
